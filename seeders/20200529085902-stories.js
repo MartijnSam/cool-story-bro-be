@@ -18,7 +18,7 @@ module.exports = {
           name: "How to test good!",
           content: "You check yoself, before you wreck yoself",
           imgUrl:
-            "https://lh3.googleusercontent.com/proxy/WhyMWIRWnwSFgynUApLi3lw0d6DOmWTJ9_8sCkwpc5nFzpi6RX2Mc3EeWzzAnh0Kew",
+            "https://live.staticflickr.com/5320/7080231075_3c2020db92_b.jpg",
           createdAt: new Date(),
           updatedAt: new Date(),
           HomepageId: 1,

@@ -1,7 +1,9 @@
 const { Router } = require("express");
 const router = new Router();
 const Homepage = require("../models/").Homepage;
+const user = require("../models/").user;
 const Story = require("../models/").Story;
+const authMiddleware = require("../auth/middleware");
 
 router.get("/", async (req, res, next) => {
   try {
@@ -48,23 +50,22 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.put("/:homepageId", async (req, res, next) => {
+router.patch("/:homepageId", authMiddleware, async (req, res, next) => {
   try {
     const homepageId = parseInt(req.params.homepageId);
     const homepage = await Homepage.findByPk(homepageId);
-    const { description, backgroundColor, color } = req.body;
+    const { title, description, backgroundColor, color } = req.body;
+
     if (!homepage) {
       res.status(404).send("The homepage was not found");
     } else {
-      const newHomepage = await Homepage.update(
-        {
-          description,
-          backgroundColor,
-          color,
-        },
-        { where: { id: homepageId } }
-      );
-      res.json(newHomepage);
+      (homepage.title = title), (homepage.description = description);
+      homepage.backgroundColor = backgroundColor;
+      homepage.color = color;
+
+      const newHomepage = await homepage.save();
+      console.log(newHomepage);
+      res.json(newHomepage.dataValues);
     }
   } catch (e) {
     next(e);
@@ -74,16 +75,23 @@ router.put("/:homepageId", async (req, res, next) => {
 router.get("/:homepageId/stories", async (req, res, next) => {
   try {
     const homepageId = parseInt(req.params.homepageId);
-    const homepage = await Homepage.findByPk(homepageId, { include: [Story] });
+    const homepage = await Homepage.findByPk(homepageId, {
+      include: [{ model: Story }, { model: user }],
+    });
     if (!homepage) {
       res.status(404).send("The homepage was not found");
-    } else res.json(homepage);
+    } else delete homepage.user.dataValues["password"];
+    delete homepage.user.dataValues["email"];
+    delete homepage.user.dataValues["id"];
+    delete homepage.user.dataValues["createdAt"];
+    delete homepage.user.dataValues["updatedAt"];
+    res.json({ homepage: homepage });
   } catch (e) {
     next(e);
   }
 });
 
-router.post("/:homepageId/stories", async (req, res, next) => {
+router.post("/:homepageId/stories", authMiddleware, async (req, res, next) => {
   try {
     const homepageId = parseInt(req.params.homepageId);
     const homepage = await Homepage.findByPk(homepageId);
@@ -93,14 +101,15 @@ router.post("/:homepageId/stories", async (req, res, next) => {
     }
     if (!homepage) {
       res.status(404).send("The homepage was not found");
-    } else
+    } else {
       const newStory = await Story.create({
         name,
         content,
         imgUrl,
         HomepageId: homepageId,
       });
-    res.json(newHomepage);
+      res.json(newStory);
+    }
   } catch (e) {
     next(e);
   }

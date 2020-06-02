@@ -3,6 +3,8 @@ const { Router } = require("express");
 const { toJWT } = require("../auth/jwt");
 const authMiddleware = require("../auth/middleware");
 const User = require("../models/").user;
+const Homepage = require("../models/").Homepage;
+const Story = require("../models").Story;
 const { SALT_ROUNDS } = require("../config/constants");
 
 const router = new Router();
@@ -17,11 +19,14 @@ router.post("/login", async (req, res, next) => {
         .send({ message: "Please provide both email and password" });
     }
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({
+      where: { email },
+      include: [{ model: Homepage, include: [Story] }],
+    });
 
     if (!user || !bcrypt.compareSync(password, user.password)) {
       return res.status(400).send({
-        message: "User with that email not found or password incorrect"
+        message: "User with that email not found or password incorrect",
       });
     }
 
@@ -35,23 +40,31 @@ router.post("/login", async (req, res, next) => {
 });
 
 router.post("/signup", async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, title } = req.body;
   if (!email || !password || !name) {
     return res.status(400).send("Please provide an email, password and a name");
   }
 
   try {
+    const newTitle = !title ? `${name}'s homepage` : title;
     const newUser = await User.create({
       email,
       password: bcrypt.hashSync(password, SALT_ROUNDS),
-      name
+      name,
+    });
+    const newHomepage = await Homepage.create({
+      title: newTitle,
+      userId: newUser.id,
+      description: null,
+      backgroundColor: "#FFFFFF",
+      color: "#000000",
     });
 
     delete newUser.dataValues["password"]; // don't send back the password hash
 
     const token = toJWT({ userId: newUser.id });
 
-    res.status(201).json({ token, ...newUser.dataValues });
+    res.status(201).json({ token, ...newUser.dataValues, newHomepage });
   } catch (error) {
     if (error.name === "SequelizeUniqueConstraintError") {
       return res
@@ -68,8 +81,16 @@ router.post("/signup", async (req, res) => {
 // - checking if a token is (still) valid
 router.get("/me", authMiddleware, async (req, res) => {
   // don't send back the password hash
-  delete req.user.dataValues["password"];
-  res.status(200).send({ ...req.user.dataValues });
+  try {
+    const user = await user.findByPk(req.user.dataValues.id, {
+      include: [{ model: Homepage, include: [Story] }],
+    });
+    console.log(`sending this:`, user);
+    delete req.user.dataValues["password"];
+    res.status(200).send({ ...req.user.dataValues });
+  } catch (error) {
+    res.status(400).send({ message: "nope" });
+  }
 });
 
 module.exports = router;
